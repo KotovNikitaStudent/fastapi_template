@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "fastapi-template"
+version = "0.1.0"
+description = ""
+authors = ["Nikita Kotov <nik-kotov-98@inbox.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.115.8"
+uvicorn = "^0.34.0"
+pydantic = "^2.10.6"
+pydantic-settings = "^2.7.1"
+sqlalchemy = "^2.0.38"
+alembic = "^1.14.1"
+
+
+[tool.poetry.group.code-quality.dependencies]
+black = "^25.1.0"
+ruff = "^0.11.5"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.4"
+pytest-asyncio = "^0.25.3"
+httpx = "^0.28.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
