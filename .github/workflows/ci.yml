@@ -26,6 +26,17 @@ jobs:
           curl -sSL https://install.python-poetry.org | python -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Cache dependencies
+        id: cache-dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry/virtualenvs
+            poetry.lock
+          key: poetry-deps-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            poetry-deps-
+
       - name: Install dependencies
         run: |
           poetry install --with code-quality,test --no-root
