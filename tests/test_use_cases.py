@@ -1,28 +1,4 @@
-import pytest
-from unittest.mock import MagicMock
 from app.core.use_cases import TaskService
-from app.core.entities import Task
-
-
-@pytest.fixture
-def mock_repo():
-    repo = MagicMock()
-    repo.add.return_value = Task(
-        id=1, title="Test", description="Desc", completed=False, created_at="2023-01-01"
-    )
-    repo.get_all.return_value = [
-        Task(
-            id=1,
-            title="Test",
-            description="Desc",
-            completed=False,
-            created_at="2023-01-01",
-        )
-    ]
-    repo.update.return_value = Task(
-        id=1, title="Test", description="Desc", completed=True, created_at="2023-01-01"
-    )
-    return repo
 
 
 def test_create_task(mock_repo):
