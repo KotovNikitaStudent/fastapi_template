@@ -28,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry install --with code-quality,test
+          poetry install --with code-quality,test --no-root
 
       - name: Run Black
         run: |
