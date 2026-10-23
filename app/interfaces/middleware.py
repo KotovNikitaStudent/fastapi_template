@@ -10,13 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class DeadlineMiddleware:
-    """Задаёт дедлайн каждому HTTP-запросу и отвечает 504 при его исчерпании.
-
-    Клиент может передать свой бюджет заголовком (по умолчанию X-Request-Timeout,
-    секунды): он применяется, если не больше request_deadline_max_seconds.
-    Дедлайн лежит в ContextVar, поэтому его видят retry и клиенты зависимостей.
-    """
-
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
@@ -42,7 +35,7 @@ class DeadlineMiddleware:
         except DeadlineExceededError:
             logger.warning("deadline of %.3fs exceeded: %s", seconds, scope["path"])
             if response_started:
-                return  # заголовки уже ушли клиенту, статус изменить нельзя
+                return
             body = json.dumps({"detail": "Request deadline exceeded"}).encode()
             await send(
                 {

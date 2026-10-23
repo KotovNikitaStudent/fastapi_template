@@ -1,15 +1,3 @@
-"""Circuit Breaker: перестаём ходить в зависимость, которая уже сломана.
-
-Состояния:
-    CLOSED     — вызовы проходят, подряд идущие ошибки считаются;
-    OPEN       — вызовы сразу отклоняются (CircuitBreakerOpenError), в
-                 зависимость запросы не уходят, пока не пройдёт recovery_timeout;
-    HALF_OPEN  — пропускаем ограниченное число пробных вызовов: успех замыкает
-                 breaker, ошибка снова размыкает его.
-
-Реализация живёт в памяти процесса: у каждого воркера своё состояние.
-"""
-
 import asyncio
 import enum
 import logging
@@ -28,7 +16,7 @@ class CircuitState(str, enum.Enum):
 
 
 class CircuitBreakerOpenError(Exception):
-    """Breaker разомкнут, вызов зависимости не выполнялся."""
+    pass
 
 
 class CircuitBreaker:
@@ -56,7 +44,6 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
-        """Текущее состояние (OPEN → HALF_OPEN по истечении recovery_timeout)."""
         if (
             self._state is CircuitState.OPEN
             and self._clock() - self._opened_at >= self.recovery_timeout
@@ -65,7 +52,6 @@ class CircuitBreaker:
         return self._state
 
     async def _before_call(self) -> bool:
-        """Возвращает True, если вызов — пробный (half-open)."""
         async with self._lock:
             state = self.state
             if state is CircuitState.OPEN:
@@ -104,7 +90,6 @@ class CircuitBreaker:
                 self._transition(CircuitState.OPEN)
 
     async def _on_cancel(self, probe: bool) -> None:
-        """Отмену (например, по дедлайну) не считаем ни успехом, ни ошибкой."""
         if probe:
             async with self._lock:
                 self._half_open_in_flight -= 1

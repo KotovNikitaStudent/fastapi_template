@@ -1,11 +1,3 @@
-"""Deadline: абсолютный срок, к которому запрос обязан завершиться.
-
-В отличие от «таймаута на вызов», дедлайн один на весь запрос: каждый
-следующий шаг (повторные попытки, походы в зависимости) получает только
-остаток бюджета. Дедлайн хранится в ContextVar, поэтому доступен в любом месте
-цепочки вызовов без явной передачи параметров (deadline propagation).
-"""
-
 import asyncio
 import time
 from contextlib import asynccontextmanager
@@ -15,12 +7,12 @@ from typing import AsyncIterator
 
 
 class DeadlineExceededError(Exception):
-    """Бюджет времени на запрос исчерпан."""
+    pass
 
 
 @dataclass(frozen=True)
 class Deadline:
-    expires_at: float  # значение time.monotonic()
+    expires_at: float
 
     @classmethod
     def after(cls, seconds: float) -> "Deadline":
@@ -34,7 +26,6 @@ class Deadline:
         return self.remaining() <= 0.0
 
     def narrow(self, seconds: float) -> "Deadline":
-        """Новый дедлайн не позже текущего: можно сузить, нельзя расширить."""
         return Deadline(min(self.expires_at, time.monotonic() + seconds))
 
 
@@ -46,18 +37,12 @@ def current_deadline() -> Deadline | None:
 
 
 def remaining_time(default: float | None = None) -> float | None:
-    """Остаток бюджета в секундах или default, если дедлайн не установлен."""
     deadline = _current.get()
     return deadline.remaining() if deadline is not None else default
 
 
 @asynccontextmanager
 async def deadline_scope(seconds: float) -> AsyncIterator[Deadline]:
-    """Устанавливает дедлайн и отменяет работу внутри блока по его истечении.
-
-    Вложенный scope может только ужесточить внешний дедлайн.
-    Наружу выбрасывается DeadlineExceededError.
-    """
     parent = _current.get()
     deadline = parent.narrow(seconds) if parent else Deadline.after(seconds)
     token = _current.set(deadline)

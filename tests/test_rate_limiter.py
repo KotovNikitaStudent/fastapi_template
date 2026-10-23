@@ -30,7 +30,6 @@ async def redis():
     await r.aclose()
 
 
-# ------------------------------------------------------------ token bucket ---
 async def test_token_bucket_allows_burst_then_blocks(redis):
     clock = FakeClock()
     rl = TokenBucketRateLimiter(redis, capacity=3, refill_per_second=1, clock=clock)
@@ -60,7 +59,6 @@ async def test_token_bucket_keys_are_independent(redis):
     assert (await rl.check("b")).allowed is True
 
 
-# ------------------------------------------------------------ fixed window ---
 async def test_fixed_window_blocks_after_limit_and_resets(redis):
     clock = FakeClock(now=600.0)  # начало окна
     rl = FixedWindowRateLimiter(redis, limit=2, window_seconds=60, clock=clock)
@@ -70,7 +68,7 @@ async def test_fixed_window_blocks_after_limit_and_resets(redis):
     assert blocked.allowed is False
     assert blocked.remaining == 0
     assert blocked.retry_after >= 1
-    clock.now += 60  # следующее окно — новый счётчик
+    clock.now += 60
     assert (await rl.check("ip")).allowed is True
 
 
@@ -82,7 +80,6 @@ async def test_fixed_window_sets_ttl_on_counter(redis):
     assert 0 < await redis.ttl(keys[0]) <= 60
 
 
-# ------------------------------------------------------------------ factory ---
 def test_factory_defaults_to_token_bucket(redis):
     s = Settings(_env_file=None)
     assert isinstance(build_rate_limiter(s, redis), TokenBucketRateLimiter)
@@ -93,7 +90,6 @@ def test_factory_can_select_fixed_window(redis):
     assert isinstance(build_rate_limiter(s, redis), FixedWindowRateLimiter)
 
 
-# ----------------------------------------------------- FastAPI-зависимость ---
 def _app(limiter) -> FastAPI:
     app = FastAPI()
 

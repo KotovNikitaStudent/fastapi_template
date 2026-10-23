@@ -1,13 +1,3 @@
-"""Retry: повтор вызова при временных (transient) сбоях.
-
-Ключевые правила, которые здесь соблюдены:
-* повторяем только ошибки, которые могут пройти сами (retry_on / is_retryable);
-* число попыток ограничено;
-* пауза растёт экспоненциально и «размазывается» случайным jitter-ом, чтобы
-  клиенты не били в зависимость синхронно (retry storm);
-* повторы не выходят за общий дедлайн запроса.
-"""
-
 import asyncio
 import logging
 import random
@@ -21,7 +11,6 @@ T = TypeVar("T")
 
 
 def backoff_delay(attempt: int, base: float, cap: float) -> float:
-    """Exponential backoff с full jitter: random(0, min(cap, base * 2**attempt))."""
     return random.uniform(0.0, min(cap, base * (2**attempt)))
 
 
@@ -35,13 +24,6 @@ async def retry_async(
     is_retryable: Callable[[BaseException], bool] | None = None,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> T:
-    """Вызывает func до max_attempts раз.
-
-    Не повторяет ошибки вне retry_on или те, для которых is_retryable вернул
-    False, а также любые DeadlineExceededError. Если до дедлайна остаётся
-    меньше, чем нужно на паузу, повторять нет смысла: пробрасываем последнюю
-    ошибку сразу.
-    """
     if max_attempts < 1:
         raise ValueError("max_attempts must be >= 1")
 

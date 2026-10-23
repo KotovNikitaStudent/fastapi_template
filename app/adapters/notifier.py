@@ -1,20 +1,3 @@
-"""Клиент внешнего сервиса уведомлений, защищённый паттернами отказоустойчивости.
-
-Порядок слоёв (снаружи внутрь):
-    deadline (бюджет на уведомление, не шире дедлайна запроса)
-      └─ retry (backoff + jitter, только transient-ошибки)
-           └─ circuit breaker (каждая попытка проходит через него)
-                └─ HTTP-вызов с таймаутом попытки
-
-Retry стоит снаружи breaker-а: breaker видит каждую неудачную попытку и,
-разомкнувшись, мгновенно прерывает дальнейшие повторы (CircuitBreakerOpenError
-не входит в retry_on).
-
-Уведомление вторично по отношению к созданию задачи, поэтому при любом сбое
-деградируем мягко: логируем и возвращаем False, а задачу не теряем.
-Исключение — исчерпание дедлайна самого запроса: оно пробрасывается наружу.
-"""
-
 import asyncio
 import logging
 from typing import Awaitable, Callable
@@ -37,14 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 class TransientNotificationError(Exception):
-    """Временный сбой зависимости (5xx / 429): имеет смысл повторить."""
+    pass
 
 
 class PermanentNotificationError(Exception):
-    """Зависимость отклонила запрос (4xx): повтор не поможет и breaker не трогаем."""
+    pass
 
 
-# Ошибки, которые считаем сбоем самой зависимости.
 _DEPENDENCY_FAILURES = (httpx.TransportError, TransientNotificationError)
 
 
@@ -77,7 +59,6 @@ class NotificationClient:
             await self._http.aclose()
 
     async def notify_task_created(self, task: Task) -> bool:
-        """True — уведомление доставлено; False — пропущено или деградировали."""
         if not self.enabled:
             return False
 
@@ -98,7 +79,7 @@ class NotificationClient:
         except DeadlineExceededError:
             outer = current_deadline()
             if outer is not None and outer.expired:
-                raise  # бюджет самого запроса кончился — это уже 504
+                raise
             logger.warning("notification budget exhausted (task %s)", task.id)
         except (*_DEPENDENCY_FAILURES, PermanentNotificationError) as exc:
             logger.warning("notification failed (task %s): %r", task.id, exc)
@@ -113,7 +94,6 @@ class NotificationClient:
         response = await self._http.post(
             self._settings.notification_service_url,
             json={"event": "task.created", "task_id": task.id, "title": task.title},
-            # Повтор POST безопасен только при идемпотентности на стороне получателя.
             headers={"Idempotency-Key": f"task-created-{task.id}"},
             timeout=per_attempt,
         )

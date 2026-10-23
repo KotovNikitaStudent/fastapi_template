@@ -30,7 +30,6 @@ def override_get_db():
 
 
 app.dependency_overrides[get_db] = override_get_db
-# Базовые тесты не зависят от Redis; лимитер проверяется в test_rate_limiter.py.
 app.dependency_overrides[get_rate_limiter] = lambda: None
 
 client = TestClient(app)

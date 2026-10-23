@@ -23,9 +23,7 @@ async def create_task(
 ):
     repo = SqlAlchemyRepository(db)
     service = TaskService(repo)
-    # Синхронная работа с БД уходит в пул потоков, чтобы не блокировать event loop.
     task = await run_in_threadpool(service.create_task, **task_data.model_dump())
-    # Побочный эффект: недоступность сервиса уведомлений не ломает создание задачи.
     await notifier.notify_task_created(task)
     return task
 
@@ -51,7 +49,6 @@ def complete_task(task_id: int, db: Session = Depends(get_db)):
 
 @router.get("/resilience/status")
 def resilience_status(notifier: NotificationClient = Depends(get_notifier)):
-    """Состояние защит: удобно для отладки и мониторинга."""
     return {
         "notification_service": {
             "enabled": notifier.enabled,

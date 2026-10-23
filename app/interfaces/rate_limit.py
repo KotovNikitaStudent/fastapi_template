@@ -12,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 def client_key(request: Request) -> str:
-    # За reverse proxy здесь нужен реальный IP клиента (X-Forwarded-For от
-    # доверенного прокси, например через uvicorn --proxy-headers).
     return request.client.host if request.client else "unknown"
 
 
@@ -23,7 +21,6 @@ async def rate_limit(
     limiter: RateLimiter | None = Depends(get_rate_limiter),
     settings: Settings = Depends(get_settings),
 ) -> None:
-    """Dependency: 429 + Retry-After, если клиент превысил лимит."""
     if limiter is None:
         return
 

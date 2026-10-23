@@ -1,5 +1,3 @@
-"""Провайдеры долгоживущих объектов (синглтоны на процесс)."""
-
 from redis.asyncio import Redis
 
 from app.adapters.notifier import NotificationClient
@@ -19,13 +17,11 @@ def get_notifier() -> NotificationClient:
 
 
 def get_rate_limiter() -> RateLimiter | None:
-    """None, если rate limiting выключен настройкой."""
     global _redis, _rate_limiter
     settings = get_settings()
     if not settings.rate_limit_enabled:
         return None
     if _rate_limiter is None:
-        # Короткие таймауты: недоступный Redis не должен съедать дедлайн запроса.
         _redis = Redis.from_url(
             settings.redis_url, socket_timeout=0.25, socket_connect_timeout=0.25
         )

@@ -19,7 +19,6 @@ from app.resilience import (
 )
 
 
-# ---------------------------------------------------------------- deadline ---
 async def test_deadline_cancels_slow_work():
     with pytest.raises(DeadlineExceededError):
         async with deadline_scope(0.05):
@@ -28,7 +27,7 @@ async def test_deadline_cancels_slow_work():
 
 async def test_nested_deadline_can_only_narrow():
     async with deadline_scope(0.5):
-        async with deadline_scope(10):  # попытка расширить — игнорируется
+        async with deadline_scope(10):
             assert remaining_time() <= 0.5
         async with deadline_scope(0.1):
             assert remaining_time() <= 0.1
@@ -60,7 +59,6 @@ async def test_deadline_middleware_returns_504():
     assert r.status_code == 504
 
 
-# ------------------------------------------------------------------- retry ---
 async def _no_sleep(_: float) -> None:
     return None
 
@@ -132,7 +130,6 @@ async def test_retry_stops_when_deadline_budget_is_too_small():
     assert calls == 1
 
 
-# ----------------------------------------------------------- circuit breaker ---
 class FakeClock:
     def __init__(self) -> None:
         self.now = 0.0
@@ -166,7 +163,7 @@ async def test_breaker_opens_after_threshold_and_rejects_calls():
             await cb.call(_fail)
     assert cb.state is CircuitState.OPEN
     with pytest.raises(CircuitBreakerOpenError):
-        await cb.call(_ok)  # в зависимость даже не ходим
+        await cb.call(_ok)
 
 
 async def test_breaker_half_open_success_closes():
@@ -219,7 +216,6 @@ async def test_breaker_ignores_unexpected_exceptions():
     assert cb.state is CircuitState.CLOSED
 
 
-# ------------------------------------------ notifier: все паттерны вместе ---
 def _task() -> Task:
     return Task(id=1, title="t", description="d", completed=False, created_at=None)
 
@@ -276,11 +272,9 @@ async def test_notifier_opens_circuit_and_stops_calling_dependency():
         raise httpx.ConnectError("down")
 
     n = _client(handler)
-    # 3 попытки одного вызова = порог breaker-а
     assert await n.notify_task_created(_task()) is False
     assert n.breaker.state is CircuitState.OPEN
     assert calls == 3
-    # следующие вызовы отсекаются breaker-ом, сеть не трогаем
     assert await n.notify_task_created(_task()) is False
     assert calls == 3
 

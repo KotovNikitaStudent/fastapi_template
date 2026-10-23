@@ -1,17 +1,3 @@
-"""Rate Limiter: не даём системе захлебнуться потоком запросов.
-
-Счётчики лежат в Redis, поэтому лимит общий для всех воркеров и инстансов.
-Каждая проверка выполняется одним Lua-скриптом, то есть атомарно: нет гонок
-между чтением и записью состояния.
-
-Два алгоритма:
-* TokenBucketRateLimiter (по умолчанию) — ведро ёмкостью `capacity`, токены
-  пополняются со скоростью `refill_per_second`; допускает короткие всплески,
-  но держит среднюю скорость.
-* FixedWindowRateLimiter — не более `limit` запросов за окно `window_seconds`;
-  проще и дешевле, но на границе окон возможен двойной всплеск.
-"""
-
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -28,18 +14,15 @@ class RateLimitResult:
     allowed: bool
     limit: int
     remaining: int
-    # Через сколько секунд имеет смысл повторить запрос (0, если allowed).
     retry_after: float
 
 
 class RateLimiter(ABC):
     @abstractmethod
     async def check(self, key: str) -> RateLimitResult:
-        """Пытается «потратить» один запрос для ключа (например, IP клиента)."""
+        pass
 
 
-# KEYS[1] — ключ ведра (hash: tokens, ts)
-# ARGV: capacity, refill_per_second, now (секунды, float), ttl (секунды)
 _TOKEN_BUCKET_LUA = """
 local capacity = tonumber(ARGV[1])
 local rate = tonumber(ARGV[2])
@@ -71,8 +54,6 @@ redis.call('EXPIRE', KEYS[1], ttl)
 return {allowed, tostring(tokens), tostring(retry_after)}
 """
 
-# KEYS[1] — счётчик окна; ARGV: window_seconds
-# Окно открывается первым запросом: INCR создаёт ключ, затем ставим TTL.
 _FIXED_WINDOW_LUA = """
 local count = redis.call('INCR', KEYS[1])
 if count == 1 then
@@ -104,8 +85,6 @@ class TokenBucketRateLimiter(RateLimiter):
         self._prefix = prefix
         self._clock = clock
         self._script = redis.register_script(_TOKEN_BUCKET_LUA)
-        # Ведро полностью пополняется за capacity / rate секунд; после этого
-        # состояние эквивалентно «ключа нет», так что ключ можно удалить.
         self._ttl = max(1, int(capacity / refill_per_second) + 1)
 
     async def check(self, key: str) -> RateLimitResult:
@@ -140,7 +119,6 @@ class FixedWindowRateLimiter(RateLimiter):
         self._script = redis.register_script(_FIXED_WINDOW_LUA)
 
     async def check(self, key: str) -> RateLimitResult:
-        # Номер окна в ключе: смена окна = новый счётчик, старый истечёт по TTL.
         window = int(self._clock() // self.window_seconds)
         count, ttl = await self._script(
             keys=[f"{self._prefix}{key}:{window}"],
@@ -157,7 +135,6 @@ class FixedWindowRateLimiter(RateLimiter):
 
 
 def build_rate_limiter(settings: "Settings", redis: Redis) -> RateLimiter:
-    """Выбирает алгоритм по настройке; по умолчанию token bucket."""
     if settings.rate_limit_algorithm == "fixed_window":
         return FixedWindowRateLimiter(
             redis,
