@@ -1,21 +1,33 @@
 from typing import List
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
+from app.adapters.notifier import NotificationClient
 from app.adapters.repository import SqlAlchemyRepository
 from app.adapters.schemas import TaskResponse, TaskCreate
 from app.core.use_cases import TaskService
 from app.database import get_db
+from app.dependencies import get_notifier
+from app.interfaces.rate_limit import rate_limit
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(rate_limit)])
 
 
 @router.post("/tasks", response_model=TaskResponse)
-def create_task(task_data: TaskCreate, db: Session = Depends(get_db)):
+async def create_task(
+    task_data: TaskCreate,
+    db: Session = Depends(get_db),
+    notifier: NotificationClient = Depends(get_notifier),
+):
     repo = SqlAlchemyRepository(db)
     service = TaskService(repo)
-    return service.create_task(**task_data.model_dump())
+    # Синхронная работа с БД уходит в пул потоков, чтобы не блокировать event loop.
+    task = await run_in_threadpool(service.create_task, **task_data.model_dump())
+    # Побочный эффект: недоступность сервиса уведомлений не ломает создание задачи.
+    await notifier.notify_task_created(task)
+    return task
 
 
 @router.get("/tasks", response_model=List[TaskResponse])
@@ -35,3 +47,14 @@ def complete_task(task_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
     return task
+
+
+@router.get("/resilience/status")
+def resilience_status(notifier: NotificationClient = Depends(get_notifier)):
+    """Состояние защит: удобно для отладки и мониторинга."""
+    return {
+        "notification_service": {
+            "enabled": notifier.enabled,
+            "circuit": notifier.breaker.state.value,
+        }
+    }
