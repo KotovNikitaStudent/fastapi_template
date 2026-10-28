@@ -122,7 +122,7 @@ async def test_retry_stops_when_deadline_budget_is_too_small():
             await retry_async(
                 always_fails,
                 max_attempts=10,
-                base_delay=100,  # любая пауза заведомо больше бюджета
+                base_delay=100,
                 max_delay=100,
                 retry_on=(ConnectionError,),
                 sleep=_no_sleep,

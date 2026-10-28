@@ -56,7 +56,6 @@ async def deadline_scope(seconds: float) -> AsyncIterator[Deadline]:
             async with timeout_cm:
                 yield deadline
         except TimeoutError as exc:
-            # Чужой TimeoutError (например, сокета) не маскируем под дедлайн.
             if not timeout_cm.expired():
                 raise
             raise DeadlineExceededError("deadline exceeded") from exc

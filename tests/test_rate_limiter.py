@@ -45,10 +45,10 @@ async def test_token_bucket_refills_over_time(redis):
     await rl.check("ip")
     await rl.check("ip")
     assert (await rl.check("ip")).allowed is False
-    clock.now += 1.0  # +1 токен
+    clock.now += 1.0
     assert (await rl.check("ip")).allowed is True
     assert (await rl.check("ip")).allowed is False
-    clock.now += 100  # ведро не переполняется выше capacity
+    clock.now += 100
     assert (await rl.check("ip")).remaining == 1
 
 
@@ -60,7 +60,7 @@ async def test_token_bucket_keys_are_independent(redis):
 
 
 async def test_fixed_window_blocks_after_limit_and_resets(redis):
-    clock = FakeClock(now=600.0)  # начало окна
+    clock = FakeClock(now=600.0)
     rl = FixedWindowRateLimiter(redis, limit=2, window_seconds=60, clock=clock)
     assert (await rl.check("ip")).allowed is True
     assert (await rl.check("ip")).allowed is True
