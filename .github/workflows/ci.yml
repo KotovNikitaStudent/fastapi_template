@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install Poetry
         run: |
@@ -30,9 +30,7 @@ jobs:
         id: cache-dependencies
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.cache/pypoetry/virtualenvs
-            poetry.lock
+          path: ~/.cache/pypoetry/virtualenvs
           key: poetry-deps-${{ hashFiles('poetry.lock') }}
           restore-keys: |
             poetry-deps-
@@ -40,10 +38,6 @@ jobs:
       - name: Install dependencies
         run: |
           poetry install --with code-quality,test --no-root
-
-      - name: Run Black
-        run: |
-          poetry run black . --check
 
       - name: Run Ruff
         run: |
